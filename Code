@@ -1,0 +1,644 @@
+"""
+Advanced Text to Logo Generator AI Model
+A sophisticated single-file Python application that generates professional logos from text
+"""
+
+import math
+import random
+import re
+from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
+import io
+import os
+
+class AdvancedLogoGenerator:
+    def _init_(self):
+        # Professional color palettes
+        self.color_schemes = [
+            # Vibrant Modern
+            ['#667EEA', '#764BA2', '#F093FB', '#4FACFE'],
+            # Ocean Blue
+            ['#00C9FF', '#92FE9D', '#00F260', '#0575E6'],
+            # Sunset
+            ['#FF6B6B', '#FFE66D', '#4ECDC4', '#45B7D1'],
+            # Forest
+            ['#134E5E', '#71B280', '#96CEB4', '#FFEAA7'],
+            # Purple Dream
+            ['#6C5CE7', '#A29BFE', '#FD79A8', '#FDCB6E'],
+            # Tech Blue
+            ['#0F2027', '#203A43', '#2C5364', '#00C9FF'],
+            # Fire
+            ['#F12711', '#F5AF19', '#FF6B6B', '#FFE66D'],
+            # Mint Fresh
+            ['#00B894', '#00CEC9', '#55EFC4', '#81ECEC'],
+            # Dark Elegant
+            ['#2D3436', '#636E72', '#B2BEC3', '#DFE6E9'],
+            # Royal
+            ['#667EEA', '#764BA2', '#F093FB', '#4FACFE'],
+        ]
+        
+        # Professional font sizes
+        self.base_sizes = [120, 150, 180, 200, 240]
+        
+    def hex_to_rgb(self, hex_color):
+        """Convert hex color to RGB"""
+        hex_color = hex_color.lstrip('#')
+        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+    
+    def rgb_to_hex(self, rgb):
+        """Convert RGB to hex"""
+        return '#{:02x}{:02x}{:02x}'.format(int(rgb[0]), int(rgb[1]), int(rgb[2]))
+    
+    def generate_radial_gradient(self, width, height, center_color, edge_color):
+        """Generate radial gradient"""
+        img = Image.new('RGB', (width, height))
+        pixels = img.load()
+        center_x, center_y = width // 2, height // 2
+        max_dist = math.sqrt(center_x*2 + center_y*2)
+        
+        c1 = self.hex_to_rgb(center_color)
+        c2 = self.hex_to_rgb(edge_color)
+        
+        for x in range(width):
+            for y in range(height):
+                dist = math.sqrt((x - center_x)*2 + (y - center_y)*2)
+                ratio = min(dist / max_dist, 1.0)
+                r = int(c1[0] * (1 - ratio) + c2[0] * ratio)
+                g = int(c1[1] * (1 - ratio) + c2[1] * ratio)
+                b = int(c1[2] * (1 - ratio) + c2[2] * ratio)
+                pixels[x, y] = (r, g, b)
+        
+        return img
+    
+    def generate_diagonal_gradient(self, width, height, colors):
+        """Generate diagonal gradient"""
+        img = Image.new('RGB', (width, height))
+        pixels = img.load()
+        
+        c1 = self.hex_to_rgb(colors[0])
+        c2 = self.hex_to_rgb(colors[1])
+        c3 = self.hex_to_rgb(colors[2]) if len(colors) > 2 else c2
+        
+        for x in range(width):
+            for y in range(height):
+                # Diagonal ratio
+                diag_ratio = (x + y) / (width + height)
+                
+                if diag_ratio < 0.5:
+                    ratio = diag_ratio * 2
+                    r = int(c1[0] * (1 - ratio) + c2[0] * ratio)
+                    g = int(c1[1] * (1 - ratio) + c2[1] * ratio)
+                    b = int(c1[2] * (1 - ratio) + c2[2] * ratio)
+                else:
+                    ratio = (diag_ratio - 0.5) * 2
+                    r = int(c2[0] * (1 - ratio) + c3[0] * ratio)
+                    g = int(c2[1] * (1 - ratio) + c3[1] * ratio)
+                    b = int(c2[2] * (1 - ratio) + c3[2] * ratio)
+                
+                pixels[x, y] = (r, g, b)
+        
+        return img
+    
+    def generate_mesh_gradient(self, width, height, colors):
+        """Generate mesh/wave gradient"""
+        img = Image.new('RGB', (width, height))
+        pixels = img.load()
+        
+        c1 = self.hex_to_rgb(colors[0])
+        c2 = self.hex_to_rgb(colors[1])
+        c3 = self.hex_to_rgb(colors[2]) if len(colors) > 2 else c1
+        
+        for x in range(width):
+            for y in range(height):
+                # Wave pattern
+                wave_x = math.sin(x / width * math.pi * 4) * 0.5 + 0.5
+                wave_y = math.cos(y / height * math.pi * 4) * 0.5 + 0.5
+                ratio = (wave_x + wave_y) / 2
+                
+                r = int(c1[0] * (1 - ratio) + c2[0] * ratio * 0.7 + c3[0] * ratio * 0.3)
+                g = int(c1[1] * (1 - ratio) + c2[1] * ratio * 0.7 + c3[1] * ratio * 0.3)
+                b = int(c1[2] * (1 - ratio) + c2[2] * ratio * 0.7 + c3[2] * ratio * 0.3)
+                
+                pixels[x, y] = (r, g, b)
+        
+        return img
+    
+    def create_text_with_gradient(self, text, font, width, height, colors):
+        """Create text with gradient fill"""
+        # Create temporary image for text
+        temp_img = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+        temp_draw = ImageDraw.Draw(temp_img)
+        
+        # Get text dimensions
+        bbox = font.getbbox(text)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+        x = (width - text_width) // 2
+        y = (height - text_height) // 2
+        
+        # Draw text in white (will be used as mask)
+        temp_draw.text((x, y), text, font=font, fill=(255, 255, 255, 255))
+        
+        # Create gradient
+        gradient = self.generate_diagonal_gradient(text_width + 20, text_height + 20, colors)
+        gradient = gradient.resize((text_width + 20, text_height + 20))
+        
+        # Create mask from text
+        mask = temp_img.crop((x - 10, y - 10, x + text_width + 10, y + text_height + 10))
+        
+        # Apply gradient to text area
+        result = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+        result.paste(gradient, (x - 10, y - 10), mask.crop((x - 10, y - 10, x + text_width + 10, y + text_height + 10)))
+        
+        return result
+    
+    def add_glow_effect(self, img, color, intensity=10):
+        """Add glow effect to image"""
+        glow = img.copy()
+        glow = glow.filter(ImageFilter.GaussianBlur(radius=intensity))
+        enhancer = ImageEnhance.Brightness(glow)
+        glow = enhancer.enhance(1.5)
+        
+        # Apply color tint using pixel manipulation
+        rgb = self.hex_to_rgb(color)
+        pixels = glow.load()
+        width, height = glow.size
+        
+        for x in range(width):
+            for y in range(height):
+                r, g, b, a = pixels[x, y]
+                r = min(255, int(r * rgb[0] / 255))
+                g = min(255, int(g * rgb[1] / 255))
+                b = min(255, int(b * rgb[2] / 255))
+                pixels[x, y] = (r, g, b, a)
+        
+        # Composite
+        result = Image.alpha_composite(glow, img)
+        return result
+    
+    def add_3d_effect(self, draw, text, font, x, y, color, depth=5):
+        """Add 3D effect to text"""
+        shadow_color = '#000000'
+        for i in range(depth, 0, -1):
+            alpha = int(100 * (1 - i/depth))
+            shadow_rgb = self.hex_to_rgb(shadow_color)
+            shadow_with_alpha = (*shadow_rgb, alpha)
+            draw.text((x + i, y + i), text, font=font, fill=shadow_with_alpha)
+        draw.text((x, y), text, font=font, fill=color)
+    
+    def add_neon_effect(self, draw, text, font, x, y, color, intensity=3):
+        """Add neon glow effect"""
+        rgb = self.hex_to_rgb(color)
+        # Outer glow layers
+        for i in range(intensity * 3, 0, -1):
+            alpha = int(50 / (i + 1))
+            glow_color = (*rgb, alpha)
+            for offset_x in range(-i, i + 1):
+                for offset_y in range(-i, i + 1):
+                    if offset_x*2 + offset_y2 <= i*2:
+                        draw.text((x + offset_x, y + offset_y), text, font=font, fill=glow_color)
+        # Main text
+        draw.text((x, y), text, font=font, fill=color)
+    
+    def add_metallic_effect(self, draw, text, font, x, y, base_color):
+        """Add metallic/shiny effect"""
+        rgb = self.hex_to_rgb(base_color)
+        # Highlight
+        highlight = (min(255, rgb[0] + 80), min(255, rgb[1] + 80), min(255, rgb[2] + 80))
+        # Shadow
+        shadow = (max(0, rgb[0] - 40), max(0, rgb[1] - 40), max(0, rgb[2] - 40))
+        
+        # Draw shadow
+        draw.text((x + 2, y + 2), text, font=font, fill=shadow)
+        # Draw main
+        draw.text((x, y), text, font=font, fill=base_color)
+        # Draw highlight on top portion
+        bbox = font.getbbox(text)
+        text_height = bbox[3] - bbox[1]
+        highlight_y = y - text_height // 4
+        draw.text((x, highlight_y), text, font=font, fill=highlight)
+    
+    def create_icon_from_text(self, text, size, color):
+        """Create icon/badge from first letter"""
+        icon = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(icon)
+        
+        # Get first letter
+        letter = text[0].upper() if text else 'A'
+        
+        # Draw circle background
+        margin = size // 8
+        draw.ellipse([margin, margin, size - margin, size - margin], 
+                    fill=color, outline='#FFFFFF', width=size // 20)
+        
+        # Draw letter
+        try:
+            font_size = int(size * 0.6)
+            font = ImageFont.truetype("arial.ttf", font_size)
+        except:
+            font = ImageFont.load_default()
+        
+        bbox = font.getbbox(letter)
+        letter_width = bbox[2] - bbox[0]
+        letter_height = bbox[3] - bbox[1]
+        letter_x = (size - letter_width) // 2
+        letter_y = (size - letter_height) // 2
+        
+        draw.text((letter_x, letter_y), letter, font=font, fill='#FFFFFF')
+        
+        return icon
+    
+    def create_decorative_shapes(self, width, height, colors, style='modern'):
+        """Create decorative background shapes"""
+        shapes = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(shapes)
+        
+        if style == 'modern':
+            # Large geometric shapes
+            for i in range(3):
+                x = random.randint(0, width)
+                y = random.randint(0, height)
+                size = random.randint(100, 300)
+                color = random.choice(colors)
+                rgb = self.hex_to_rgb(color)
+                alpha = random.randint(20, 60)
+                
+                # Draw polygon
+                points = []
+                for j in range(6):
+                    angle = j * math.pi / 3
+                    px = x + size * math.cos(angle)
+                    py = y + size * math.sin(angle)
+                    points.append((px, py))
+                
+                draw.polygon(points, fill=(*rgb, alpha))
+        
+        elif style == 'abstract':
+            # Flowing curves
+            for i in range(5):
+                color = random.choice(colors)
+                rgb = self.hex_to_rgb(color)
+                alpha = random.randint(30, 80)
+                
+                points = []
+                for j in range(20):
+                    x = j * width // 20
+                    y = height // 2 + random.randint(-100, 100) * math.sin(j * 0.5)
+                    points.append((x, y))
+                
+                if len(points) > 2:
+                    draw.polygon(points + [(width, height), (0, height)], 
+                               fill=(*rgb, alpha))
+        
+        elif style == 'tech':
+            # Grid and lines
+            color = colors[0]
+            rgb = self.hex_to_rgb(color)
+            alpha = 40
+            
+            # Grid
+            for i in range(0, width, 50):
+                draw.line([(i, 0), (i, height)], fill=(*rgb, alpha), width=1)
+            for i in range(0, height, 50):
+                draw.line([(0, i), (width, i)], fill=(*rgb, alpha), width=1)
+            
+            # Diagonal lines
+            for i in range(5):
+                x1 = random.randint(0, width)
+                y1 = random.randint(0, height)
+                x2 = random.randint(0, width)
+                y2 = random.randint(0, height)
+                draw.line([(x1, y1), (x2, y2)], fill=(*rgb, alpha + 20), width=2)
+        
+        return shapes
+    
+    def get_optimal_font_size(self, text, width, height, min_size=40, max_size=300):
+        """Calculate optimal font size"""
+        try:
+            # Try to use a better font
+            font_paths = [
+                "arial.ttf", "calibri.ttf", "verdana.ttf", 
+                "C:/Windows/Fonts/arial.ttf",
+                "C:/Windows/Fonts/calibri.ttf"
+            ]
+            font_path = None
+            for path in font_paths:
+                if os.path.exists(path):
+                    font_path = path
+                    break
+        except:
+            font_path = None
+        
+        for size in range(max_size, min_size, -5):
+            try:
+                if font_path:
+                    font = ImageFont.truetype(font_path, size)
+                else:
+                    font = ImageFont.load_default()
+            except:
+                font = ImageFont.load_default()
+            
+            try:
+                bbox = font.getbbox(text)
+                text_width = bbox[2] - bbox[0]
+                text_height = bbox[3] - bbox[1]
+            except:
+                text_width = len(text) * size // 2
+                text_height = size
+            
+            if text_width < width * 0.85 and text_height < height * 0.7:
+                return font, size
+        
+        return ImageFont.load_default(), min_size
+    
+    def generate_logo(self, text, style='premium', size=(1200, 600), 
+                     background_color=None, text_color=None, 
+                     output_path='logo.png'):
+        """
+        Generate advanced professional logo
+        
+        Styles: premium, modern, classic, tech, elegant, bold, minimal, gradient
+        """
+        width, height = size
+        
+        # Select color scheme
+        scheme = random.choice(self.color_schemes)
+        
+        # Create sophisticated background
+        if style == 'gradient' or style == 'premium':
+            bg = self.generate_mesh_gradient(width, height, scheme)
+        elif style == 'tech':
+            bg = self.generate_radial_gradient(width, height, scheme[0], '#000000')
+        elif style == 'elegant':
+            bg = self.generate_diagonal_gradient(width, height, [scheme[0], scheme[2]])
+        else:
+            bg_color = background_color if background_color else scheme[0]
+            bg = Image.new('RGB', (width, height), self.hex_to_rgb(bg_color))
+        
+        # Add decorative shapes
+        if style in ['premium', 'modern', 'tech']:
+            shapes = self.create_decorative_shapes(width, height, scheme, 
+                                                  'modern' if style != 'tech' else 'tech')
+            bg = Image.alpha_composite(bg.convert('RGBA'), shapes).convert('RGB')
+        
+        # Convert to RGBA for effects
+        bg = bg.convert('RGBA')
+        draw = ImageDraw.Draw(bg)
+        
+        # Get optimal font
+        font, font_size = self.get_optimal_font_size(text, width, height)
+        
+        # Calculate text position
+        try:
+            bbox = font.getbbox(text)
+            text_width = bbox[2] - bbox[0]
+            text_height = bbox[3] - bbox[1]
+            ascent = -bbox[1]
+        except:
+            text_width = len(text) * font_size // 2
+            text_height = font_size
+            ascent = font_size
+        
+        x = (width - text_width) // 2
+        y = (height - text_height) // 2 - ascent
+        
+        # Select text color
+        if text_color:
+            txt_color = self.hex_to_rgb(text_color)
+        else:
+            txt_color = self.hex_to_rgb(scheme[-1])
+        
+        # Create icon/badge
+        if style in ['premium', 'modern', 'elegant']:
+            icon_size = int(height * 0.3)
+            icon = self.create_icon_from_text(text, icon_size, scheme[1])
+            icon_x = x - icon_size - 30
+            icon_y = (height - icon_size) // 2
+            bg.paste(icon, (icon_x, icon_y), icon)
+        
+        # Apply style-specific text effects
+        if style == 'premium':
+            # Gradient text with glow
+            text_img = self.create_text_with_gradient(text, font, width, height, scheme[1:])
+            bg = Image.alpha_composite(bg, text_img)
+            # Add glow
+            glow_img = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+            glow_draw = ImageDraw.Draw(glow_img)
+            glow_draw.text((x, y), text, font=font, fill=(*txt_color, 200))
+            glow_img = glow_img.filter(ImageFilter.GaussianBlur(radius=8))
+            bg = Image.alpha_composite(bg, glow_img)
+            # Main text
+            draw.text((x, y), text, font=font, fill=(*txt_color, 255))
+        
+        elif style == 'modern':
+            # Neon effect
+            self.add_neon_effect(draw, text, font, x, y, 
+                               self.rgb_to_hex(txt_color), intensity=4)
+        
+        elif style == 'classic':
+            # 3D effect with shadow
+            self.add_3d_effect(draw, text, font, x, y, 
+                             self.rgb_to_hex(txt_color), depth=8)
+        
+        elif style == 'tech':
+            # Metallic with outline
+            self.add_metallic_effect(draw, text, font, x, y, 
+                                   self.rgb_to_hex(txt_color))
+            # Add tech outline
+            for i in range(-3, 4):
+                for j in range(-3, 4):
+                    if i != 0 or j != 0:
+                        draw.text((x + i, y + j), text, font=font, 
+                                fill=(*self.hex_to_rgb(scheme[2]), 100))
+        
+        elif style == 'elegant':
+            # Subtle gradient with shadow
+            text_img = self.create_text_with_gradient(text, font, width, height, 
+                                                     [scheme[2], scheme[3]])
+            bg = Image.alpha_composite(bg, text_img)
+            # Soft shadow
+            shadow_img = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+            shadow_draw = ImageDraw.Draw(shadow_img)
+            shadow_draw.text((x + 3, y + 3), text, font=font, fill=(0, 0, 0, 80))
+            shadow_img = shadow_img.filter(ImageFilter.GaussianBlur(radius=5))
+            bg = Image.alpha_composite(bg, shadow_img)
+            draw.text((x, y), text, font=font, fill=(*txt_color, 255))
+        
+        elif style == 'bold':
+            # Thick outline with gradient
+            outline_color = '#FFFFFF'
+            for i in range(-5, 6):
+                for j in range(-5, 6):
+                    if abs(i) + abs(j) <= 5:
+                        draw.text((x + i, y + j), text, font=font, fill=outline_color)
+            text_img = self.create_text_with_gradient(text, font, width, height, scheme)
+            bg = Image.alpha_composite(bg, text_img)
+        
+        elif style == 'minimal':
+            # Clean simple text
+            draw.text((x, y), text, font=font, fill=(*txt_color, 255))
+        
+        else:  # default
+            # Modern with effects
+            self.add_neon_effect(draw, text, font, x, y, 
+                               self.rgb_to_hex(txt_color), intensity=3)
+        
+        # Add subtle border/frame for premium styles
+        if style in ['premium', 'elegant']:
+            border_color = self.hex_to_rgb(scheme[1])
+            draw.rectangle([10, 10, width - 10, height - 10], 
+                         outline=(*border_color, 150), width=3)
+        
+        # Convert back to RGB and save
+        bg = bg.convert('RGB')
+        bg.save(output_path, 'PNG', quality=95, optimize=True)
+        print(f"✓ Professional logo saved to {output_path}")
+        return bg
+    
+    def generate_multiple_styles(self, text, output_dir='logos'):
+        """Generate logos in all premium styles"""
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        
+        styles = ['premium', 'modern', 'classic', 'tech', 'elegant', 'bold', 'minimal', 'gradient']
+        
+        # Sanitize filename once
+        safe_name = sanitize_filename(text)
+        
+        for style in styles:
+            output_path = os.path.join(output_dir, f'{style}_{safe_name}.png')
+            self.generate_logo(text, style=style, size=(1200, 600), output_path=output_path)
+        
+        print(f"\n✓ Generated {len(styles)} professional logo variations in '{output_dir}' directory")
+
+
+def sanitize_filename(text, max_length=80):
+    """Sanitize text for use as filename"""
+    # Try to extract meaningful text (words in quotes, capitalized words, or first few words)
+    # Look for quoted text first (like "QuickBite")
+    quoted = re.findall(r'"([^"]+)"', text)
+    if quoted:
+        text = quoted[0]
+    else:
+        # Look for capitalized words (likely brand names)
+        capitalized = re.findall(r'\b[A-Z][a-z]+\b', text)
+        if capitalized and len(capitalized) <= 3:
+            text = ' '.join(capitalized)
+        else:
+            # Take first few words (up to 5)
+            words = text.split()[:5]
+            text = ' '.join(words)
+    
+    # Remove invalid characters for Windows filenames
+    invalid_chars = r'[<>:"/\\|?*\x00-\x1f]'
+    text = re.sub(invalid_chars, '', text)
+    
+    # Replace spaces and special characters with underscores
+    text = re.sub(r'[^\w\s-]', '', text)
+    text = re.sub(r'[-\s]+', '_', text)
+    
+    # Remove leading/trailing underscores and dots
+    text = text.strip('_.')
+    
+    # Limit length
+    if len(text) > max_length:
+        text = text[:max_length].rstrip('_')
+    
+    # Ensure it's not empty
+    if not text:
+        text = "logo"
+    
+    return text.lower()
+
+
+def main():
+    """Main function to run the advanced logo generator"""
+    generator = AdvancedLogoGenerator()
+    
+    print("=" * 60)
+    print("  ADVANCED TEXT TO LOGO GENERATOR AI")
+    print("=" * 60)
+    print()
+    
+    # Get user input
+    user_input = input("Enter text for logo: ").strip()
+    if not user_input:
+        text = "LOGO"
+        print("Using default text: LOGO")
+    else:
+        # Extract meaningful text from description
+        # Look for quoted text first (like "QuickBite")
+        quoted = re.findall(r'"([^"]+)"', user_input)
+        if quoted:
+            text = quoted[0]
+            print(f"Using logo text: {text}")
+        else:
+            # Look for capitalized words (likely brand names)
+            capitalized = re.findall(r'\b[A-Z][a-z]+\b', user_input)
+            if capitalized and len(capitalized) <= 3:
+                text = ''.join(capitalized)  # Join without spaces for logo
+                print(f"Using logo text: {text}")
+            else:
+                # Use first meaningful word or default
+                words = [w for w in user_input.split() if w and w[0].isupper()][:1]
+                if words:
+                    text = words[0]
+                    print(f"Using logo text: {text}")
+                else:
+                    text = user_input[:20]  # Use first 20 chars if nothing else found
+                    print(f"Using logo text: {text}")
+    
+    print("\n" + "=" * 60)
+    print("Available Premium Styles:")
+    print("=" * 60)
+    print("1. Premium      - Gradient text with glow & icon")
+    print("2. Modern       - Neon effects with geometric shapes")
+    print("3. Classic      - 3D depth with shadows")
+    print("4. Tech         - Metallic with grid background")
+    print("5. Elegant      - Subtle gradient with icon")
+    print("6. Bold         - Thick outline with gradient")
+    print("7. Minimal      - Clean and simple")
+    print("8. Gradient     - Mesh gradient background")
+    print("9. All Styles   - Generate all variations")
+    print("=" * 60)
+    
+    choice = input("\nSelect style (1-9, default=1): ").strip()
+    
+    style_map = {
+        '1': 'premium',
+        '2': 'modern',
+        '3': 'classic',
+        '4': 'tech',
+        '5': 'elegant',
+        '6': 'bold',
+        '7': 'minimal',
+        '8': 'gradient',
+        '9': 'all'
+    }
+    
+    style = style_map.get(choice, 'premium')
+    
+    if style == 'all':
+        generator.generate_multiple_styles(text)
+    else:
+        safe_name = sanitize_filename(text)
+        output_path = f"logo_{safe_name}.png"
+        generator.generate_logo(text, style=style, size=(1200, 600), output_path=output_path)
+        print(f"\n{'='*60}")
+        print(f"✓ Logo generated successfully!")
+        print(f"✓ Open '{output_path}' to view your professional logo.")
+        print(f"{'='*60}")
+
+
+if _name_ == "_main_":
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n\nOperation cancelled by user.")
+    except ImportError as e:
+        print(f"\nError: {e}")
+        print("Make sure Pillow is installed: pip install Pillow")
+    except Exception as e:
+        print(f"\nError: {e}")
+        import traceback
+        traceback.print_exc()
+        print("\nMake sure Pillow is installed: pip install Pillow")

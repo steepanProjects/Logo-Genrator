@@ -206,7 +206,7 @@ Select style (1-9, default=1): 1
 **Steepan P**
 B.Tech in Artificial Intelligence and Data Science
 📍 Coimbatore, India
-🔗 [GitHub](https://github.com/Dharshika-112) | [LinkedIn](https://www.linkedin.com/in/dharshi1106/)
+
 
 ---
 
